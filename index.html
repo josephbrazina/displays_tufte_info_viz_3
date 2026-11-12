@@ -6,83 +6,78 @@
 <title>Albums as sound</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#e8edf3; --surface:#f8fafc; --ink:#14213d; --muted:#5a6a82; --line:#c7d1dd; --accent:#d97f00; --danger:#b03a2e;
+    --bg:#ffffff; --ink:#111111; --muted:#6e6e6e; --faint:#a3a3a3; --line:#e4e4e4; --wave:#9c9c9c;
     color-scheme:light;
-  }
-  @media (prefers-color-scheme: dark){
-    :root:not([data-theme="light"]){
-      --bg:#0e1626; --surface:#162135; --ink:#e4ebf5; --muted:#91a2ba; --line:#283852; --accent:#ffb12e; --danger:#ff8a7a;
-      color-scheme:dark;
-    }
-  }
-  :root[data-theme="dark"]{
-    --bg:#0e1626; --surface:#162135; --ink:#e4ebf5; --muted:#91a2ba; --line:#283852; --accent:#ffb12e; --danger:#ff8a7a;
-    color-scheme:dark;
   }
   :root{ box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
   *,*::before,*::after{ box-sizing:inherit; }
   html{ scroll-padding-top:env(safe-area-inset-top,0px); }
   body{
     margin:0; background:var(--bg); color:var(--ink);
-    font-family:"Bricolage Grotesque", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    line-height:1.5; padding-bottom:5.5rem;
+    font-family:"Hanken Grotesk", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    line-height:1.5; padding-bottom:5rem; -webkit-font-smoothing:antialiased;
   }
-  main{ max-width:1360px; margin:0 auto; padding:2.5rem 1.25rem 2rem; }
+  main{ max-width:1360px; margin:0 auto; padding:3.5rem 1.5rem 2rem; }
   [hidden]{ display:none !important; }
   h1{
-    font-weight:800; font-size:clamp(1.9rem, 4.5vw, 3.2rem); line-height:1.02;
-    letter-spacing:-0.02em; margin:0 0 .5rem; max-width:24ch; overflow-wrap:anywhere;
+    font-weight:500; font-size:clamp(1.8rem, 3.6vw, 2.6rem); line-height:1.1;
+    letter-spacing:-0.02em; margin:0 0 .6rem; max-width:28ch; overflow-wrap:anywhere;
   }
-  .lede{ color:var(--muted); margin:0 0 1.5rem; max-width:64ch; font-size:1.05rem; }
-  .meta{ color:var(--muted); margin:0; font-variant-numeric:tabular-nums; }
-  .hint{ color:var(--muted); font-size:.92rem; margin:.8rem 0 0; max-width:78ch; }
-  kbd{ font-family:inherit; border:1px solid var(--line); border-radius:4px; padding:0 .3em; font-size:.85em; }
-  .status{ margin-top:1rem; color:var(--muted); min-height:1.5em; }
-  .status.error{ color:var(--danger); }
+  .lede{ color:var(--muted); margin:0 0 1.5rem; max-width:62ch; font-size:1rem; }
+  .meta{ color:var(--muted); margin:0; font-size:.9rem; font-variant-numeric:tabular-nums; }
+  .hint{ color:var(--faint); font-size:.85rem; margin:.6rem 0 0; max-width:78ch; }
+  kbd{ font-family:inherit; border:1px solid var(--line); border-radius:2px; padding:0 .3em; font-size:.85em; color:var(--muted); }
+  .status{ margin-top:1rem; color:var(--muted); min-height:1.5em; font-size:.9rem; }
+  .status.error{ color:var(--ink); }
+  .status.error::before{ content:"! "; font-weight:600; }
 
   .btn{
-    position:relative; display:inline-block; border:1px solid var(--line); border-radius:999px;
-    padding:.5rem 1.1rem; cursor:pointer; font:inherit; font-weight:600; background:var(--surface); color:var(--ink);
+    position:relative; display:inline-block; border:1px solid var(--ink); border-radius:2px;
+    padding:.45rem 1rem; cursor:pointer; font:inherit; font-size:.9rem; font-weight:500; background:transparent; color:var(--ink);
   }
-  .btn.primary{ background:var(--accent); border-color:var(--accent); color:#1a1300; }
-  .btn.small{ padding:.3rem .8rem; font-size:.9rem; }
+  .btn:hover{ background:var(--ink); color:var(--bg); }
+  .btn.primary{ background:var(--ink); color:var(--bg); }
+  .btn.primary:hover{ background:#3a3a3a; border-color:#3a3a3a; }
+  .btn.small{ padding:.2rem .65rem; font-size:.8rem; border-color:var(--line); color:var(--muted); }
+  .btn.small:hover{ border-color:var(--ink); background:transparent; color:var(--ink); }
+  .btn:disabled{ opacity:.5; cursor:default; }
   .btn input{ position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; }
-  .btn:focus-within, .btn:focus-visible{ outline:3px solid var(--ink); outline-offset:3px; }
+  .btn:focus-within, .btn:focus-visible{ outline:2px solid var(--ink); outline-offset:3px; }
   .ghost{
-    background:none; border:1px solid var(--line); color:var(--ink);
-    border-radius:999px; padding:.45rem 1rem; font:inherit; cursor:pointer;
+    background:none; border:0; color:var(--muted); padding:0; font:inherit; font-size:.9rem; cursor:pointer;
   }
-  .linkish{ background:none; border:0; padding:0; font:inherit; color:var(--muted); text-decoration:underline; cursor:pointer; }
-  .ghost:focus-visible, .play:focus-visible, .plot:focus-visible, .tplot:focus-visible, .strip:focus-visible, .linkish:focus-visible, .open:focus-visible{ outline:3px solid var(--ink); outline-offset:3px; }
+  .ghost:hover{ color:var(--ink); }
+  .linkish{ background:none; border:0; padding:0; font:inherit; color:var(--muted); text-decoration:underline; text-underline-offset:2px; cursor:pointer; }
+  .ghost:focus-visible, .play:focus-visible, .plot:focus-visible, .tplot:focus-visible, .strip:focus-visible, .linkish:focus-visible, .open:focus-visible{ outline:2px solid var(--ink); outline-offset:3px; }
 
   .drop{
     display:flex; flex-direction:column; align-items:flex-start; gap:.75rem;
-    border:2px dashed var(--line); border-radius:14px; padding:2.25rem 1.75rem; background:var(--surface);
+    border:1px dashed var(--faint); padding:2.25rem 1.75rem;
   }
-  .drop.over{ border-color:var(--accent); }
-  .drop strong{ font-size:1.2rem; font-weight:600; }
-  .drop span{ color:var(--muted); }
+  .drop.over{ border-color:var(--ink); }
+  .drop strong{ font-size:1.05rem; font-weight:500; }
+  .drop span{ color:var(--muted); font-size:.9rem; }
 
-  .head-row{ display:flex; align-items:flex-start; gap:1rem; flex-wrap:wrap; }
+  .head-row{ display:flex; align-items:flex-start; gap:1.25rem; flex-wrap:wrap; }
   .head-row > div:first-child{ flex:1 1 22rem; }
-  .legend{ display:flex; align-items:center; gap:.5rem; color:var(--muted); font-size:.85rem; margin-top:.8rem; }
-  .legend .ramp{ width:140px; height:12px; border-radius:3px; }
+  .legend{ display:flex; align-items:center; gap:.5rem; color:var(--faint); font-size:.8rem; margin-top:.8rem; }
+  .legend .ramp{ width:120px; height:8px; }
 
   /* Overview: one row per artist, one column per album */
-  .matrix{ margin-top:2rem; display:flex; flex-direction:column; gap:2rem; }
-  .artist-row{ display:grid; grid-template-columns:11rem repeat(3, minmax(0,1fr)); gap:1rem 1.1rem; align-items:start; }
-  .artist-row h2{ font-size:1.25rem; font-weight:800; margin:.15rem 0 0; line-height:1.15; overflow-wrap:anywhere; }
-  .artist-row .count{ display:block; font-size:.85rem; font-weight:400; color:var(--muted); margin-top:.2rem; }
-  .cell-head{ display:flex; align-items:center; gap:.6rem; margin-bottom:.45rem; min-height:44px; }
-  .cell-head img{ width:44px; height:44px; object-fit:cover; border-radius:4px; flex:none; background:var(--line); }
-  .cell-head .t{ min-width:0; flex:1; line-height:1.2; }
-  .open{ background:none; border:0; padding:0; font:inherit; font-weight:600; color:var(--ink); text-align:left; cursor:pointer; display:block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .open:hover{ text-decoration:underline; }
-  .cell-head .sub{ display:block; color:var(--muted); font-size:.85rem; font-variant-numeric:tabular-nums; }
-  .strip{ border-radius:6px; cursor:crosshair; }
+  .matrix{ margin-top:2.5rem; display:flex; flex-direction:column; }
+  .artist-row{ display:grid; grid-template-columns:11rem repeat(3, minmax(0,1fr)); gap:1rem 1.5rem; align-items:start; padding:1.5rem 0; border-top:1px solid var(--line); }
+  .artist-row h2{ font-size:1rem; font-weight:600; margin:.1rem 0 0; line-height:1.25; overflow-wrap:anywhere; }
+  .artist-row .count{ display:block; font-size:.8rem; font-weight:400; color:var(--faint); margin-top:.15rem; }
+  .cell-head{ display:flex; align-items:center; gap:.6rem; margin-bottom:.5rem; min-height:40px; }
+  .cell-head img{ width:40px; height:40px; object-fit:cover; flex:none; }
+  .cell-head .t{ min-width:0; flex:1; line-height:1.25; }
+  .open{ background:none; border:0; padding:0; font:inherit; font-size:.95rem; font-weight:500; color:var(--ink); text-align:left; cursor:pointer; display:block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .open:hover{ text-decoration:underline; text-underline-offset:2px; }
+  .cell-head .sub{ display:block; color:var(--faint); font-size:.8rem; font-variant-numeric:tabular-nums; }
+  .strip{ cursor:crosshair; }
   .strip canvas, .tplot canvas, .plot canvas{ display:block; width:100%; touch-action:manipulation; }
   @media (max-width: 900px){
     .artist-row{ grid-template-columns:repeat(auto-fill, minmax(min(100%, 260px), 1fr)); }
@@ -90,42 +85,44 @@
   }
 
   /* Album view */
-  .album-cover{ width:88px; height:88px; object-fit:cover; border-radius:6px; flex:none; }
+  .album-cover{ width:88px; height:88px; object-fit:cover; flex:none; }
   .grid{
-    list-style:none; margin:1.5rem 0 0; padding:0;
-    display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 290px), 1fr)); gap:1.5rem 1.1rem;
+    list-style:none; margin:2rem 0 0; padding:0;
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 290px), 1fr)); gap:2rem 1.5rem;
   }
-  .tile h3{ display:flex; gap:.55rem; align-items:baseline; margin:0 0 .35rem; font-size:1rem; font-weight:600; line-height:1.25; }
-  .tile .no{ color:var(--muted); font-variant-numeric:tabular-nums; min-width:1.4em; }
+  .tile h3{ display:flex; gap:.55rem; align-items:baseline; margin:0 0 .4rem; font-size:.9rem; font-weight:500; line-height:1.25; }
+  .tile .no{ color:var(--faint); font-variant-numeric:tabular-nums; min-width:1.4em; }
   .tile .name{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
-  .tile .dur{ color:var(--muted); font-weight:400; font-variant-numeric:tabular-nums; }
-  .tile.playing .no, .tile.playing .name{ color:var(--accent); }
-  .tplot{ border-radius:8px; cursor:crosshair; }
+  .tile .dur{ color:var(--faint); font-weight:400; font-variant-numeric:tabular-nums; }
+  .tile.playing .name{ font-weight:600; }
+  .tile.playing .no::before{ content:"▸ "; color:var(--ink); }
+  .tplot{ cursor:crosshair; }
 
   /* Song view */
-  .crumbs{ display:flex; gap:.6rem; flex-wrap:wrap; margin-bottom:1.5rem; }
-  .plot{ position:relative; border-radius:12px; background:var(--surface); padding:.75rem .5rem .25rem; cursor:crosshair; margin-top:1.25rem; }
-  .micro{ margin-top:1.75rem; }
-  .micro-head{ display:flex; align-items:baseline; gap:1rem; flex-wrap:wrap; }
-  .micro-head h2{ font-size:1.35rem; font-weight:600; margin:0; font-variant-numeric:tabular-nums; }
-  .micro .plot{ margin-top:.6rem; }
+  .crumbs{ display:flex; gap:1.25rem; flex-wrap:wrap; margin-bottom:2rem; }
+  .plot{ position:relative; cursor:crosshair; margin-top:1.5rem; }
+  .micro{ margin-top:2.5rem; padding-top:1.5rem; border-top:1px solid var(--line); }
+  .micro-head{ display:flex; align-items:baseline; gap:1.25rem; flex-wrap:wrap; }
+  .micro-head h2{ font-size:1rem; font-weight:500; margin:0; font-variant-numeric:tabular-nums; }
+  .micro .plot{ margin-top:.75rem; }
 
-  footer{ max-width:1360px; margin:0 auto; padding:0 1.25rem 2rem; color:var(--muted); font-size:.85rem; }
+  footer{ max-width:1360px; margin:0 auto; padding:2rem 1.5rem; color:var(--faint); font-size:.8rem; border-top:1px solid var(--line); }
+  footer .linkish{ color:var(--faint); }
 
   .bar{
     position:fixed; left:0; right:0; bottom:0; z-index:5;
-    display:flex; align-items:center; gap:1rem;
-    background:var(--surface); border-top:1px solid var(--line);
-    padding:.65rem 1.25rem calc(.65rem + env(safe-area-inset-bottom,0px));
+    display:flex; align-items:center; gap:.9rem;
+    background:rgba(255,255,255,.96); border-top:1px solid var(--line);
+    padding:.6rem 1.5rem calc(.6rem + env(safe-area-inset-bottom,0px));
   }
   .play{
-    width:2.9rem; height:2.9rem; border-radius:50%; border:0; cursor:pointer;
-    background:var(--accent); color:#1a1300; display:grid; place-items:center; flex:none;
+    width:2.25rem; height:2.25rem; border-radius:50%; border:0; cursor:pointer;
+    background:var(--ink); color:var(--bg); display:grid; place-items:center; flex:none;
   }
-  .play svg{ width:1.15rem; height:1.15rem; }
-  .bar .now{ display:flex; flex-direction:column; min-width:0; line-height:1.25; }
-  .bar #barTitle{ font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .bar .clock{ color:var(--muted); font-variant-numeric:tabular-nums; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .play svg{ width:.9rem; height:.9rem; }
+  .bar .now{ display:flex; flex-direction:column; min-width:0; line-height:1.3; font-size:.9rem; }
+  .bar #barTitle{ font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .bar .clock{ color:var(--muted); font-size:.8rem; font-variant-numeric:tabular-nums; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 </style>
 </head>
 <body>
@@ -226,7 +223,7 @@
 
   const $ = id => document.getElementById(id);
   const cv = $('cv'), mcv = $('mcv'), plot = $('plot'), microEl = $('micro'), icon = $('icon');
-  const FONT = '"Bricolage Grotesque", system-ui, sans-serif';
+  const FONT = '"Hanken Grotesk", "Helvetica Neue", Helvetica, Arial, sans-serif';
 
   const S = {
     view:'loading', artists:[], albums:[], maxAlbumDur:1,
@@ -242,12 +239,18 @@
   const colors = () => {
     const c = getComputedStyle(document.documentElement);
     return { ink:c.getPropertyValue('--ink').trim(), muted:c.getPropertyValue('--muted').trim(),
-             accent:c.getPropertyValue('--accent').trim(), line:c.getPropertyValue('--line').trim(),
-             surface:c.getPropertyValue('--surface').trim(), bg:c.getPropertyValue('--bg').trim() };
+             wave:c.getPropertyValue('--wave').trim(), line:c.getPropertyValue('--line').trim(),
+             faint:c.getPropertyValue('--faint').trim(), bg:c.getPropertyValue('--bg').trim() };
   };
   const natural = (a,b) => a.localeCompare(b, undefined, { numeric:true, sensitivity:'base' });
   const tidy = s => s.replace(/\.[^.\/]+$/, '').replace(/^\d{1,2}[\s._-]+/, '').replace(/_/g, ' ').trim();
   const tidyFolder = s => s.replace(/^\d{1,2}[\s._-]+/, '').replace(/_/g, ' ').trim();
+
+  // Playhead: black across the waveform, white across the dark spectrogram
+  function playhead(g, x, envTop, envH, specTop, specH, C){
+    g.fillStyle = C.ink; g.fillRect(x-1, envTop, 2, envH);
+    g.fillStyle = '#ffffff'; g.fillRect(x-1, specTop, 2, specH);
+  }
 
   // ---------- Signal processing ----------
   function fft(re, im){
@@ -774,9 +777,9 @@
     const mid = G.envH/2, half = G.envH/2, W = al.stripPeak.length;
     for (let x = 0; x < G.sw; x++){
       const c = Math.min(W-1, Math.floor(x/G.sw*W)), played = playing && x <= px && x >= playing.start/al.dur*G.sw;
-      g.globalAlpha = 0.3; g.fillStyle = played ? C.accent : C.muted;
+      g.globalAlpha = 0.3; g.fillStyle = played ? C.ink : C.faint;
       const p = al.stripPeak[c]*half; g.fillRect(x, mid-p, 1, p*2);
-      g.globalAlpha = 1; g.fillStyle = played ? C.accent : C.ink;
+      g.globalAlpha = 1; g.fillStyle = played ? C.ink : C.wave;
       const r = Math.min(1, al.stripRms[c]*1.5)*half; g.fillRect(x, mid-r, 1, r*2);
     }
     g.imageSmoothingEnabled = true;
@@ -791,11 +794,11 @@
       const label = al.hover.t.no + '. ' + al.hover.t.title + ', ' + fmt(al.hover.at);
       g.font = '600 11px ' + FONT;
       const tw = Math.min(G.w, g.measureText(label).width + 10), lx = Math.min(G.w - tw, Math.max(0, hx - tw/2));
-      g.fillStyle = 'rgba(14,24,52,.88)'; g.fillRect(lx, G.specTop + 4, tw, 17);
+      g.fillStyle = 'rgba(17,17,17,.9)'; g.fillRect(lx, G.specTop + 4, tw, 17);
       g.fillStyle = '#ffffff'; g.textAlign = 'left'; g.textBaseline = 'middle';
       g.save(); g.beginPath(); g.rect(lx, G.specTop + 4, tw, 17); g.clip(); g.fillText(label, lx + 5, G.specTop + 12.5); g.restore();
     }
-    if (playing){ g.fillStyle = C.accent; g.fillRect(Math.round(px)-1, 0, 2, G.specTop + G.specH); }
+    if (playing) playhead(g, Math.round(px), 0, G.envH, G.specTop, G.specH, C);
   }
 
   // ---------- Album view ----------
@@ -891,9 +894,9 @@
     const mid = G.envH/2, half = G.envH/2;
     for (let x = 0; x < G.tw; x++){
       const c = Math.min(COLS-1, Math.floor(x/G.tw*COLS)), played = x <= px;
-      g.globalAlpha = 0.3; g.fillStyle = played ? C.accent : C.muted;
+      g.globalAlpha = 0.3; g.fillStyle = played ? C.ink : C.faint;
       const p = t.peak[c]*half; g.fillRect(x, mid-p, 1, p*2);
-      g.globalAlpha = 1; g.fillStyle = played ? C.accent : C.ink;
+      g.globalAlpha = 1; g.fillStyle = played ? C.ink : C.wave;
       const r = Math.min(1, t.rms[c]*1.5)*half; g.fillRect(x, mid-r, 1, r*2);
     }
     g.imageSmoothingEnabled = true;
@@ -903,10 +906,10 @@
       const label = fmt(t.hover/G.tw*t.dur);
       g.font = '600 11px ' + FONT;
       const tw = g.measureText(label).width + 8, lx = Math.min(G.w - tw, Math.max(0, t.hover - tw/2));
-      g.fillStyle = 'rgba(14,24,52,.85)'; g.fillRect(lx, G.specTop + 4, tw, 16);
+      g.fillStyle = 'rgba(17,17,17,.9)'; g.fillRect(lx, G.specTop + 4, tw, 16);
       g.fillStyle = '#ffffff'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(label, lx+4, G.specTop + 12);
     }
-    if (isPlay){ g.fillStyle = C.accent; g.fillRect(Math.round(px)-1, 0, 2, G.specTop + G.specH); }
+    if (isPlay) playhead(g, Math.round(px), 0, G.envH, G.specTop, G.specH, C);
   }
 
   // ---------- Song view ----------
@@ -954,9 +957,9 @@
     const mid = Ly.envTop + Ly.envH/2, half = Ly.envH/2;
     for (let x = 0; x < Ly.plotW; x++){
       const c = Math.min(COLS-1, Math.floor(x/Ly.plotW*COLS)), X = Ly.L + x, played = X <= px;
-      g.globalAlpha = 0.28; g.fillStyle = played ? C.accent : C.muted;
+      g.globalAlpha = 0.28; g.fillStyle = played ? C.ink : C.faint;
       const p = t.peak[c]*half; g.fillRect(X, mid-p, 1, p*2);
-      g.globalAlpha = 1; g.fillStyle = played ? C.accent : C.ink;
+      g.globalAlpha = 1; g.fillStyle = played ? C.ink : C.wave;
       const r = Math.min(1, t.rms[c]*1.5)*half; g.fillRect(X, mid-r, 1, r*2);
     }
     g.imageSmoothingEnabled = true;
@@ -977,15 +980,15 @@
       const label = fmt((hx-Ly.L)/Ly.plotW*t.dur);
       g.font = '600 12px ' + FONT;
       const tw = g.measureText(label).width + 10, lx = Math.min(Ly.w-tw, Math.max(Ly.L, hx - tw/2));
-      g.fillStyle = 'rgba(14,24,52,.85)'; g.fillRect(lx, Ly.specTop + 6, tw, 18);
+      g.fillStyle = 'rgba(17,17,17,.9)'; g.fillRect(lx, Ly.specTop + 6, tw, 18);
       g.fillStyle = '#ffffff'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(label, lx+5, Ly.specTop + 15);
     }
     if (S.micro && S.micro.t === t){
       const x0 = Ly.L + S.micro.t0/t.dur*Ly.plotW, x1 = Ly.L + S.micro.t1/t.dur*Ly.plotW;
       const top = S.micro.kind === 'wave' ? Ly.envTop : Ly.specTop, hh = S.micro.kind === 'wave' ? Ly.envH : Ly.specH;
-      g.strokeStyle = C.accent; g.lineWidth = 2; g.strokeRect(x0, top + 1, Math.max(3, x1-x0), hh - 2);
+      g.strokeStyle = S.micro.kind === 'wave' ? C.ink : '#ffffff'; g.lineWidth = 1.5; g.strokeRect(x0, top + 1, Math.max(3, x1-x0), hh - 2);
     }
-    if (mine){ g.fillStyle = C.accent; g.fillRect(px-1, Ly.envTop, 2, Ly.specTop + Ly.specH - Ly.envTop); }
+    if (mine) playhead(g, Math.round(px), Ly.envTop, Ly.envH, Ly.specTop, Ly.specH, C);
     plot.setAttribute('aria-valuenow', Math.round(time));
     plot.setAttribute('aria-valuetext', fmt(time) + ' of ' + fmt(t.dur));
     drawMicro(mine ? time : -1, C);
@@ -1050,7 +1053,7 @@
       g.fillStyle = C.muted; g.globalAlpha = 0.4; g.fillRect(Ly.L, mid, Ly.plotW, 1); g.globalAlpha = 1;
       for (let x = 0; x < M.mins.length; x++){
         const X = Ly.L + x;
-        g.fillStyle = (inSpan && X <= px) || time > M.t1 ? C.accent : C.ink;
+        g.fillStyle = (inSpan && X <= px) || time > M.t1 ? C.ink : C.wave;
         const top = mid - Math.min(1, M.maxs[x])*half, bot = mid - Math.max(-1, M.mins[x])*half;
         g.fillRect(X, top, 1, Math.max(1, bot - top));
       }
@@ -1066,7 +1069,7 @@
       g.fillRect(x, Ly.top + Ly.ph, 1, 4);
       g.fillText(fmt(s), Math.min(Ly.w-14, Math.max(Ly.L+10, x)), Ly.top + Ly.ph + 7);
     }
-    if (inSpan){ g.fillStyle = C.accent; g.fillRect(px-1, Ly.top, 2, Ly.ph); }
+    if (inSpan){ g.fillStyle = M.kind === 'wave' ? C.ink : '#ffffff'; g.fillRect(Math.round(px)-1, Ly.top, 2, Ly.ph); }
   }
 
   // ---------- Playback ----------
