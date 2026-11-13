@@ -176,7 +176,7 @@
     <h1 id="ovTitle" class="sr-only">Albums as sound</h1>
     <div class="ov-head">
       <div>
-        <p class="ov-text">Each circle is one album with its songs placed end to end, running clockwise from 12 o’clock. Low frequencies sit on the inner edge of the ring and high frequencies on the outer edge, with the waveform inside. Every album shares one time scale and one loudness scale: longer albums wrap further around, and lighter color means louder sound. Each album takes its hues from its own cover.</p>
+        <p class="ov-text">Each circle is one album with its songs placed end to end, running clockwise from 12 o’clock. Low frequencies sit on the inner edge of the ring and high frequencies on the outer edge, with the waveform inside. Each album fills its whole circle, starting at the mark at 12 o’clock, so the circles compare the shape of each album rather than its length (lengths are listed beside each one). Every album shares one loudness scale: lighter color means louder sound. Each album takes its hues from its own cover.</p>
         <p class="hint">Albums load when you ask for them. Click a circle to play from that spot, double-click it or click the album’s name to open it. <button class="linkish" id="forgetOv">Forget saved analysis</button></p>
       </div>
       <button class="btn primary" id="loadAll">Load every album</button>
@@ -858,7 +858,7 @@
       drawCell(al);
     });
   }
-  const albumArc = al => ARC * al.dur / S.maxAlbumDur;
+  const albumArc = al => 1;   // every album fills the whole circle
   function stripHit(al, e){
     if (al.status !== 'ready' || !al.bounds || !al.L) return null;
     const G = al.L.G, p = polarAt(e, al.cv, G), arc = albumArc(al);
@@ -872,7 +872,7 @@
     const g = al.cv.getContext('2d'), C = colors(), G = al.L.G;
     g.setTransform(al.L.dpr,0,0,al.L.dpr,0,0);
     g.clearRect(0,0,G.size,G.size);
-    const ticks = []; for (let s = 600; s < S.maxAlbumDur; s += 600) ticks.push(ARC * s / S.maxAlbumDur);   // every 10 minutes
+    const ticks = []; if (al.dur) for (let s = 600; s < al.dur; s += 600) ticks.push(s / al.dur);   // every 10 minutes of this album
     if (al.status !== 'ready' || !al.oq){
       const msg = al.status === 'loading' ? al.progress + ' / ' + al.tracks.length : al.status === 'queued' ? 'Waiting' : '';
       emptyIris(g, G, msg, C);
@@ -882,7 +882,8 @@
     if (!al.base || al.baseKey !== key){
       al.base = irisBase(G, al.L.dpr, arc, al.oW, al.oR, (c, r) => al.oq[c*al.oR + r], al.lut); al.baseKey = key;
     }
-    scaleRing(g, G, ARC, ticks, C);
+    scaleRing(g, G, 1, ticks, C);
+    radial(g, G, 0, G.R1 + 1.5, G.R1 + 8, C.ink, 1.5);   // start, at 12 o'clock
     g.drawImage(al.base, 0, 0, G.size, G.size);
     const playing = S.play && S.play.album === al ? al.bounds.find(b => b.t === S.play) : null;
     const a0 = playing ? playing.start/al.dur : 2, a1 = playing ? (playing.start + curTime())/al.dur : -1;
