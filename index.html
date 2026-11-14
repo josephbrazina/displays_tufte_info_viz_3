@@ -276,8 +276,8 @@
              faint:c.getPropertyValue('--faint').trim(), bg:c.getPropertyValue('--bg').trim() };
   };
   const natural = (a,b) => a.localeCompare(b, undefined, { numeric:true, sensitivity:'base' });
-  const tidy = s => s.replace(/\.[^.\/]+$/, '').replace(/^\d{1,2}[\s._-]+/, '').replace(/_/g, ' ').trim();
-  const tidyFolder = s => s.replace(/^\d{1,2}[\s._-]+/, '').replace(/_/g, ' ').trim();
+  const tidy = s => s.replace(/\.[^.\/]+$/, '').replace(/^\d{1,2}[\s._-]+/, '').replace(/_/g, ' ').replace(/:/g, '/').trim();   // macOS stores a typed “/” as “:”
+  const tidyFolder = s => s.replace(/^\d{1,2}[\s._-]+/, '').replace(/_/g, ' ').replace(/:/g, '/').trim();
 
   // ---------- Signal processing ----------
   function fft(re, im){
@@ -605,7 +605,7 @@
 
   // ---------- Analysing albums ----------
   function trackData(t, d){
-    Object.assign(t, { dur:d.dur, sr:d.sr, fmax:d.fmax, peak:d.peak, rms:d.rms, q:d.q, status:'ready' });
+    Object.assign(t, { dur:d.dur, sr:d.sr, fmax:d.fmax, peak:d.peak, rms:d.rms, q:d.q, q0:d.q, peak0:d.peak, rms0:d.rms, gain:0, status:'ready' });
     // Song names always come from the file name, never from tags inside the file
   }
   async function restoreAlbum(al){
@@ -648,8 +648,33 @@
     al.failed = failed;
     finishAlbum(al);
   }
+  // Level-match outliers: a song more than LM_GAP dB quieter than its album's typical (median) level
+  // is raised to LM_GAP dB below that level. Every other song stays on the shared loudness scale.
+  const LM_GAP = 10, LM_MAX = 30;
+  function songLevel(t){
+    let sum = 0; for (let i = 0; i < t.rms0.length; i++) sum += t.rms0[i]*t.rms0[i];
+    return 10*Math.log10(sum / t.rms0.length + 1e-12);
+  }
+  function setGain(t, g){
+    if (Math.abs((t.gain || 0) - g) < 0.05) return;
+    t.gain = g;
+    if (g <= 0){ t.q = t.q0; t.peak = t.peak0; t.rms = t.rms0; }
+    else {
+      const k = g*255/(QHI-QLO), lin = Math.pow(10, g/20);
+      t.q = new Uint8Array(t.q0.length); for (let i = 0; i < t.q0.length; i++) t.q[i] = Math.min(255, Math.round(t.q0[i] + k));
+      t.peak = t.peak0.map(v => Math.min(1, v*lin)); t.rms = t.rms0.map(v => v*lin);
+    }
+    t.bands = null; t.img = null; t.base = null; t.sbase = null;
+  }
+  function levelMatch(al){
+    const ready = al.tracks.filter(t => t.status === 'ready'); if (!ready.length) return;
+    const lv = ready.map(songLevel), sorted = lv.slice().sort((a,b) => a-b), med = sorted[Math.floor(sorted.length/2)];
+    ready.forEach((t, i) => setGain(t, Math.min(LM_MAX, Math.max(0, (med - LM_GAP) - lv[i]))));
+  }
+  const gainLabel = t => '';   // the boost is applied but not labeled
   function finishAlbum(al){
     al.status = 'ready';
+    levelMatch(al);
     const ready = al.tracks.filter(t => t.status === 'ready');
     al.dur = ready.reduce((s,t) => s + t.dur, 0);
     al.maxSong = Math.max(1, ...ready.map(t => t.dur));
@@ -979,7 +1004,7 @@
     $('albumBands').innerHTML = bandLegendHtml(al);
     if (al.status !== 'ready') al.maxSong = Math.max(1, ...ready.map(t => t.dur));
     al.tracks.forEach(t => {
-      if (t.durEl) t.durEl.textContent = t.status === 'ready' ? fmt(t.dur) : '';
+      if (t.durEl){ t.durEl.textContent = t.status === 'ready' ? fmt(t.dur) + gainLabel(t) : ''; t.durEl.title = ''; }
       if (t.nameEl) { t.nameEl.textContent = t.title; t.nameEl.title = t.title; }
     });
   }
@@ -1179,7 +1204,7 @@
     for (let r = 0; r < MROWS; r++){
       let m = 0;
       for (let b = M.b0[r]; b < M.b1[r]; b++){ const v = re[b]*re[b] + im[b]*im[b]; if (v > m) m = v; }
-      const db = 10*Math.log10(m + 1e-12) + offset;
+      const db = 10*Math.log10(m + 1e-12) + offset + (M.t.gain || 0);
       M.q[base + r] = Math.max(0, Math.min(255, Math.round((db - QLO)*k255)));
     }
     for (let k = 0; k < BANDS.length; k++){
