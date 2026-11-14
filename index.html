@@ -111,6 +111,36 @@
     .artist-row h2{ grid-column:1 / -1; }
   }
 
+  /* Artist picker: All artists · each artist */
+  .artists-nav{ display:flex; flex-wrap:wrap; gap:.25rem 1.1rem; margin-top:.7rem; font-size:.85rem; flex:none; }
+  .artists-nav button{ background:none; border:0; padding:.1rem 0; font:inherit; color:var(--muted); cursor:pointer; border-bottom:1.5px solid transparent; }
+  .artists-nav button:hover{ color:var(--ink); }
+  .artists-nav button[aria-pressed="true"]{ color:var(--ink); font-weight:600; border-bottom-color:var(--ink); }
+  .artists-nav button:focus-visible, .artist-name:focus-visible{ outline:2px solid var(--ink); outline-offset:3px; }
+  .artists-nav .sep{ color:var(--line); }
+  .artist-name{ background:none; border:0; padding:0; font:inherit; color:inherit; text-align:left; cursor:pointer; }
+  .artist-name:hover{ text-decoration:underline; text-underline-offset:2px; }
+
+  /* One artist: the same three albums, larger, side by side */
+  .matrix.focus .artist-row{ display:none; }
+  .matrix.focus .artist-row.on{ display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); grid-template-rows:auto minmax(0,1fr); gap:1rem 2.5rem; border-top:0; padding-top:.25rem; }
+  .matrix.focus .artist-row.on h2{ grid-column:1 / -1; font-size:1.35rem; }
+  .matrix.focus .artist-row.on h2 .count{ display:inline; margin-left:.6rem; font-size:.85rem; }
+  .matrix.focus .cell{ flex-direction:column; align-items:center; gap:.6rem; }
+  .matrix.focus .strip{ width:100%; max-width:none; height:auto; aspect-ratio:1 / 1; }
+  .matrix.focus .cell-head{ flex:none; flex-direction:row; align-items:center; justify-content:center; gap:.7rem; width:100%; }
+  .matrix.focus .cell-head .t{ flex:0 1 auto; }
+  @media (min-width: 900px) and (min-height: 560px){
+    main.fill .matrix.focus{ grid-template-rows:minmax(0,1fr); }
+    main.fill .matrix.focus .cell{ container-type:size; justify-content:flex-start; }
+    main.fill .matrix.focus .strip{ flex:none; aspect-ratio:auto; max-width:none; min-height:0;
+      width:min(100cqw, 100cqh - 4.5rem); height:min(100cqw, 100cqh - 4.5rem); }
+  }
+  @media (max-width: 900px){
+    .matrix.focus .artist-row.on{ grid-template-columns:1fr; }
+    .matrix.focus .strip{ max-width:520px; }
+  }
+
   /* Album view */
   .album-cover{ width:88px; height:88px; object-fit:cover; flex:none; }
   .grid{
@@ -180,21 +210,22 @@
     <div class="ov-head">
       <div>
         <p class="ov-text">Each circle is one album with its songs placed end to end, running clockwise from 12 o’clock. Low frequencies sit on the inner edge of the ring and high frequencies on the outer edge. Inside, the waveform is split into three rings in the album’s own colors: lows such as kicks and bass innermost, then mids such as vocals and instruments, then highs such as hi-hats and cymbals. Each album fills its whole circle, starting at the mark at 12 o’clock, so the circles compare the shape of each album rather than its length (lengths are listed beside each one). Every album shares one loudness scale: lighter color means louder sound. Each album takes its hues from its own cover.</p>
-        <p class="hint">Albums load when you ask for them. Click a circle to play from that spot, double-click it or click the album’s name to open it. <button class="linkish" id="forgetOv">Forget saved analysis</button></p>
+        <p class="hint">Albums load when you ask for them. Click a circle to play from that spot, double-click it or click the album’s name to open it. Click an artist’s name (or press <kbd>1</kbd>–<kbd>5</kbd>) to see just their three albums, larger; <kbd>0</kbd> or <kbd>Esc</kbd> shows everyone again. <button class="linkish" id="forgetOv">Forget saved analysis</button></p>
       </div>
       <button class="btn primary" id="loadAll">Load every album</button>
     </div>
+    <nav class="artists-nav" id="artistsNav" aria-label="Show one artist"></nav>
     <div class="status" id="ovStatus" role="status" aria-live="polite"></div>
     <div class="matrix" id="matrix"></div>
   </section>
 
   <!-- One album -->
   <section id="vAlbum" hidden>
-    <div class="crumbs"><button class="ghost" id="albumBack">Back to all albums</button></div>
+    <div class="crumbs"><button class="ghost" id="albumBack">Back to all albums</button><button class="ghost" id="albumArtistBtn"></button></div>
     <div class="head-row">
       <img class="album-cover" id="albumCover" alt="" hidden>
       <div>
-        <p class="meta" id="albumArtist"></p>
+        <p class="meta"><button class="artist-name" id="albumArtist" title="Show this artist’s albums"></button></p>
         <h1 id="albumTitle"></h1>
         <p class="meta" id="albumMeta"></p>
         <div class="legend"><span>Ring:</span><span>Quiet</span><span class="ramp" id="albumRamp"></span><span>Loud</span></div>
@@ -259,7 +290,7 @@
   const FONT = '"Hanken Grotesk", "Helvetica Neue", Helvetica, Arial, sans-serif';
 
   const S = {
-    view:'loading', artists:[], albums:[], maxAlbumDur:1,
+    view:'loading', artists:[], albums:[], focus:null, maxAlbumDur:1,
     album:null, song:null, ctx:null,
     play:null, src:null, playing:false, startedAt:0, offset:0, playToken:0,
     cur:null, decoding:null, micro:null, layout:null, mlayout:null, hover:null,
@@ -580,11 +611,13 @@
       setStatus($('pickStatus'), 'No albums were found. The music folder should hold artist folders, each with album folders containing songs.', true);
       return;
     }
+    S.focus = artistFromHash();   // e.g. …/#pink-floyd opens on that artist
     buildMatrix();
     showView('overview');
     S.albums.forEach(al => loadCover(al));
     // Albums analysed before open straight away from saved data
     for (const al of S.albums) await restoreAlbum(al);
+    if (S.focus) S.focus.albums.forEach(queueAlbum);
   }
 
   // ---------- Covers ----------
@@ -896,8 +929,11 @@
     const m = $('matrix'); m.innerHTML = '';
     m.style.setProperty('--rows', S.artists.length);
     S.artists.forEach(ar => {
-      const row = document.createElement('section'); row.className = 'artist-row';
-      const h = document.createElement('h2'); h.textContent = ar.name;
+      const row = document.createElement('section'); row.className = 'artist-row'; ar.row = row;
+      const h = document.createElement('h2');
+      const nb = document.createElement('button'); nb.className = 'artist-name'; nb.textContent = ar.name;
+      nb.addEventListener('click', () => focusArtist(S.focus === ar ? null : ar));
+      ar.nameBtn = nb; h.appendChild(nb);
       const cnt = document.createElement('span'); cnt.className = 'count'; cnt.textContent = ar.albums.length + (ar.albums.length === 1 ? ' album' : ' albums');
       h.appendChild(cnt); row.appendChild(h);
       ar.albums.forEach(al => {
@@ -927,7 +963,50 @@
       });
       m.appendChild(row);
     });
+    buildArtistsNav();
+    applyFocus();
+  }
+
+  // ---------- One artist ----------
+  // The overview narrowed to one artist's row, so their albums are drawn larger side by side.
+  const slug = s => s.toLowerCase().normalize('NFKD').replace(/[^\w]+/g, '-').replace(/^-|-$/g, '');
+  function buildArtistsNav(){
+    const nav = $('artistsNav'); nav.innerHTML = '';
+    const mk = (label, ar) => {
+      const b = document.createElement('button'); b.textContent = label; b.dataset.k = ar ? ar.key : '';
+      b.addEventListener('click', () => focusArtist(ar));
+      nav.appendChild(b);
+    };
+    mk('All artists', null);
+    const sep = document.createElement('span'); sep.className = 'sep'; sep.textContent = '|'; sep.setAttribute('aria-hidden', 'true'); nav.appendChild(sep);
+    S.artists.forEach(ar => mk(ar.name, ar));
+  }
+  function applyFocus(){
+    const f = S.focus;
+    $('matrix').classList.toggle('focus', !!f);
+    $('matrix').style.setProperty('--rows', f ? 1 : S.artists.length);
+    S.artists.forEach(ar => {
+      if (ar.row) ar.row.classList.toggle('on', ar === f);
+      if (ar.nameBtn) ar.nameBtn.title = ar === f ? 'Show every artist' : 'Show only ' + ar.name;
+    });
+    $('artistsNav').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.k === (f ? f.key : ''))));
+    $('loadAll').textContent = f ? 'Load these albums' : 'Load every album';
     sizeCells();
+  }
+  function focusArtist(ar, fromHash){
+    S.focus = ar || null;
+    if (!fromHash){
+      const h = ar ? '#' + slug(ar.name) : ' ';
+      try { history.replaceState(null, '', h === ' ' ? location.pathname + location.search : h); } catch(e){}
+    }
+    if (S.view !== 'overview'){ S.micro = null; microEl.hidden = true; showView('overview'); }
+    applyFocus();
+    window.scrollTo(0, 0);
+    if (ar) ar.albums.forEach(queueAlbum);   // their albums start loading right away
+  }
+  function artistFromHash(){
+    const h = decodeURIComponent(location.hash.slice(1)); if (!h) return null;
+    return S.artists.find(a => slug(a.name) === slug(h)) || null;
   }
   function updateCellText(al){
     if (!al.sub) return;
@@ -986,6 +1065,8 @@
     S.album = al;
     $('albumTitle').textContent = al.name;
     $('albumArtist').textContent = al.artist.name;
+    $('albumBack').textContent = S.focus ? 'Back to ' + S.focus.name : 'Back to all albums';
+    $('albumArtistBtn').textContent = S.focus ? 'All artists' : 'All ' + al.artist.name + ' albums';
     const ci = $('albumCover');
     if (al.coverUrl){ ci.src = al.coverUrl; ci.hidden = false; } else ci.hidden = true;
     setStatus($('albumStatus'), '');
@@ -1393,6 +1474,9 @@
   // ---------- Events ----------
   $('loadAll').addEventListener('click', () => S.albums.forEach(queueAlbum));
   $('albumBack').addEventListener('click', backToOverview);
+  $('albumArtist').addEventListener('click', () => { const al = S.album; backToOverview(); focusArtist(al.artist); });
+  $('albumArtistBtn').addEventListener('click', () => { const al = S.album; backToOverview(); focusArtist(S.focus ? null : al.artist); });
+  window.addEventListener('hashchange', () => { if (S.artists.length) focusArtist(artistFromHash(), true); });
   $('songBack').addEventListener('click', backToAlbum);
   $('songHome').addEventListener('click', () => { S.micro = null; microEl.hidden = true; backToOverview(); });
   $('closeMicro').addEventListener('click', closeMicro);
@@ -1431,6 +1515,12 @@
     if (e.key === 'Escape'){
       if (S.view === 'song'){ e.preventDefault(); if (!microEl.hidden) closeMicro(); else backToAlbum(); return; }
       if (S.view === 'album'){ e.preventDefault(); backToOverview(); return; }
+      if (S.view === 'overview' && S.focus){ e.preventDefault(); focusArtist(null); return; }
+    }
+    if (S.view === 'overview' && !(e.target.closest && e.target.closest('input, textarea, select')) && !e.metaKey && !e.ctrlKey && !e.altKey){
+      if (e.key === '0'){ e.preventDefault(); focusArtist(null); return; }
+      const n = parseInt(e.key, 10);
+      if (n >= 1 && n <= S.artists.length){ e.preventDefault(); focusArtist(S.artists[n-1]); return; }
     }
     if (inControl || !['overview','album','song'].includes(S.view)) return;
     if (e.key === ' '){ e.preventDefault(); toggle(); }
