@@ -606,7 +606,7 @@
   // ---------- Analysing albums ----------
   function trackData(t, d){
     Object.assign(t, { dur:d.dur, sr:d.sr, fmax:d.fmax, peak:d.peak, rms:d.rms, q:d.q, status:'ready' });
-    if (d.title) t.title = d.title;
+    // Song names always come from the file name, never from tags inside the file
   }
   async function restoreAlbum(al){
     if (al.status !== 'idle') return;
@@ -1054,7 +1054,8 @@
 
   // ---------- Song view ----------
   function openSong(t){
-    S.song = t; S.micro = null; S.mlayout = null; microEl.hidden = true; S.hover = null;
+    if (S.song && S.song !== t) S.song.sbase = null;
+    S.song = t; S.micro = null; microEl.hidden = true; S.hover = null;
     $('songTitle').textContent = t.title;
     $('songMeta').textContent = t.album.artist.name + ', ' + t.album.name + ', song ' + t.no + ' of ' + t.album.tracks.length + ', ' + fmt(t.dur);
     plot.setAttribute('aria-valuemax', Math.round(t.dur));
@@ -1065,7 +1066,8 @@
     plot.focus({ preventScroll:true });
   }
   function backToAlbum(){
-    S.micro = null; S.mlayout = null; microEl.hidden = true; S.hover = null; hideTip();
+    if (S.song) S.song.sbase = null;
+    S.micro = null; microEl.hidden = true; S.hover = null; hideTip();
     showView('album'); sizeTiles();
     if (S.song && S.song.li){ S.song.li.scrollIntoView({ block:'center' }); S.song.box.focus({ preventScroll:true }); }
   }
@@ -1140,6 +1142,7 @@
     if (S.song !== t || S.view !== 'song') return;
     if (!S.micro || S.micro.t !== t){
       const sr = cur.buf.sampleRate, fmax = Math.min(FMAX, sr/2), ratio = fmax / FMIN, total = Math.ceil(t.dur * MCPS);
+      const P = microPool(total);
       const b0 = new Int32Array(MROWS), b1 = new Int32Array(MROWS);
       for (let r = 0; r < MROWS; r++){
         const f0 = FMIN * Math.pow(ratio, r/MROWS), f1 = FMIN * Math.pow(ratio, (r+1)/MROWS);
@@ -1147,15 +1150,25 @@
       }
       const win = new Float32Array(MN); for (let i = 0; i < MN; i++) win[i] = 0.5 - 0.5*Math.cos(2*Math.PI*i/(MN-1));
       const lr = Math.log(fmax/FMIN), rowOf = f => Math.max(0, Math.min(MROWS, Math.round(MROWS*Math.log(f/FMIN)/lr)));
-      S.micro = { t, mono: cur.mono, sr, fmax, total, b0, b1, win, re: new Float32Array(MN), im: new Float32Array(MN),
-        q: new Uint8Array(total*MROWS), done: new Uint8Array(total), bands: BANDS.map(() => new Float32Array(total)),
+      S.micro = { t, mono: cur.mono, sr, fmax, total, b0, b1, win, re: P.re, im: P.im,
+        q: P.q, done: P.done, bands: P.bands,
         bandRows: BANDS.map(b => { const r0 = rowOf(b.f0); return [r0, Math.max(r0 + 1, rowOf(Math.min(b.f1, fmax)))]; }),
-        wb: BANDS.map(() => new Float32Array(WIN*MCPS)) };
+        wb: P.wb };
     }
     S.micro.center = h.at;
     $('microTitle').textContent = 'Close-up: the ten seconds around the playhead';
     sizeMicro(); drawSong();
     microEl.scrollIntoView({ block:'nearest' });
+  }
+  // One set of buffers, grown when a longer song needs it, so switching songs allocates nothing new
+  let POOL = null;
+  function microPool(total){
+    if (!POOL || POOL.cap < total){
+      const cap = Math.ceil(total * 1.25);
+      POOL = { cap, q: new Uint8Array(cap*MROWS), done: new Uint8Array(cap), bands: BANDS.map(() => new Float32Array(cap)),
+               re: new Float32Array(MN), im: new Float32Array(MN), wb: BANDS.map(() => new Float32Array(WIN*MCPS)) };
+    } else POOL.done.fill(0, 0, total);
+    return POOL;
   }
   function microColumn(M, c){
     if (M.done[c]) return;
@@ -1176,7 +1189,7 @@
     }
     M.done[c] = 1;
   }
-  function closeMicro(){ S.micro = null; S.mlayout = null; microEl.hidden = true; drawSong(); }
+  function closeMicro(){ S.micro = null; microEl.hidden = true; drawSong(); }
   // Precompute, for every pixel of the ring, where it falls in the window (0–1) and which frequency row it shows
   function sizeMicro(){
     if (!S.micro || microEl.hidden || !S.layout) return;
@@ -1184,9 +1197,11 @@
     const size = Math.round(Math.max(300, Math.min(w, window.innerHeight*0.72)));
     const dpr = Math.min(1.5, window.devicePixelRatio || 1);
     mcv.width = mcv.height = Math.round(size*dpr); mcv.style.width = mcv.style.height = size + 'px';
-    const G = irisGeom(size, 34), px = Math.round(size*dpr);
+    const G = irisGeom(size, 34), px = Math.round(size*dpr), key = size + '|' + dpr;
+    if (S.mlayout && S.mlayout.key === key) return;
     const cx = G.cx*dpr, cy = G.cy*dpr, R0 = G.R0*dpr, R1 = G.R1*dpr, span = R1 - R0;
-    const pix = [], us = [], rows = [], alphas = [];
+    const max = px*px, pix = new Int32Array(max), u = new Float32Array(max), row = new Uint8Array(max), alpha = new Uint8Array(max);
+    let n = 0;
     for (let y = 0; y < px; y++){
       const dy = y + 0.5 - cy;
       for (let x = 0; x < px; x++){
@@ -1196,13 +1211,13 @@
         const f = a / TAU; if (f >= ARC) continue;
         const al = Math.max(0, Math.min(1, r - R0 + 0.5, R1 - r + 0.5, (ARC - f)*TAU*r + 0.5, f*TAU*r + 0.5));
         if (al <= 0) continue;
-        pix.push((y*px + x)*4); us.push(f/ARC); rows.push(Math.max(0, Math.min(MROWS-1, ((r - R0)/span*MROWS) | 0))); alphas.push(Math.round(al*255));
+        pix[n] = (y*px + x)*4; u[n] = f/ARC; row[n] = Math.max(0, Math.min(MROWS-1, ((r - R0)/span*MROWS) | 0)); alpha[n] = Math.round(al*255); n++;
       }
     }
     const off = document.createElement('canvas'); off.width = off.height = px;
     const octx = off.getContext('2d');
-    S.mlayout = { size, dpr, G, off, octx, img: octx.createImageData(px, px),
-      pix: Int32Array.from(pix), u: Float32Array.from(us), row: Uint8Array.from(rows), alpha: Uint8Array.from(alphas) };
+    S.mlayout = { key, size, dpr, G, off, octx, img: octx.createImageData(px, px), n,
+      pix: pix.slice(0, n), u: u.slice(0, n), row: row.slice(0, n), alpha: alpha.slice(0, n) };
   }
   function microCenter(time){
     const M = S.micro;
@@ -1213,13 +1228,22 @@
     if (!S.micro || !S.mlayout || microEl.hidden) return;
     const M = S.micro, Ly = S.mlayout, G = Ly.G, g = mcv.getContext('2d');
     const center = microCenter(time), t0 = center - WIN/2, colsW = WIN*MCPS;
-    const cStart = Math.floor(t0*MCPS);
-    for (let c = Math.max(0, cStart); c <= Math.min(M.total - 1, cStart + colsW + 1); c++) microColumn(M, c);
+    const cStart = Math.floor(t0*MCPS), cMid = Math.floor(center*MCPS), half = Math.ceil(colsW/2) + 1, deadline = performance.now() + 6;
+    let pending = false;
+    for (let k = 0; k <= half; k++){
+      for (const c of [cMid + k, cMid - k - 1]){
+        if (c < 0 || c >= M.total || M.done[c]) continue;
+        if (performance.now() > deadline){ pending = true; break; }
+        microColumn(M, c);
+      }
+      if (pending) break;
+    }
+    if (pending && !S.playing) requestAnimationFrame(() => drawSong());
     // Ring
-    const lut = M.t.album.lut, d = Ly.img.data, n = Ly.pix.length;
+    const lut = M.t.album.lut, d = Ly.img.data, n = Ly.n;
     for (let i = 0; i < n; i++){
       const c = Math.floor((t0 + Ly.u[i]*WIN)*MCPS), p = Ly.pix[i];
-      if (c < 0 || c >= M.total){ d[p+3] = 0; continue; }
+      if (c < 0 || c >= M.total || !M.done[c]){ d[p+3] = 0; continue; }
       const k = M.q[c*MROWS + Ly.row[i]]*3;
       d[p] = lut[k]; d[p+1] = lut[k+1]; d[p+2] = lut[k+2]; d[p+3] = Ly.alpha[i];
     }
@@ -1230,7 +1254,7 @@
     g.drawImage(Ly.off, 0, 0, G.size, G.size);
     // Waveform rings for the same window
     for (let j = 0; j < colsW; j++){
-      const c = cStart + j, ok = c >= 0 && c < M.total;
+      const c = cStart + j, ok = c >= 0 && c < M.total && M.done[c];
       for (let k = 0; k < BANDS.length; k++) M.wb[k][j] = ok ? M.bands[k][c] : 0;
     }
     const pf = time >= 0 && S.play === M.t ? (time - t0)/WIN : -1;
@@ -1322,12 +1346,19 @@
     else if (S.view === 'song') drawSong();
     updateBar();
   }
+  // Only one animation loop may run; starting playback again just keeps the existing loop going
+  let loopRunning = false;
   function loop(){
+    if (loopRunning) return;
+    loopRunning = true;
+    requestAnimationFrame(tick);
+  }
+  function tick(){
     if (S.view === 'overview' && S.play) drawCell(S.play.album);
     else if (S.view === 'album' && S.play) drawTile(S.play);
     else if (S.view === 'song') drawSong();
     updateBar();
-    if (S.playing) requestAnimationFrame(loop);
+    if (S.playing) requestAnimationFrame(tick); else loopRunning = false;
   }
 
   // ---------- Events ----------
