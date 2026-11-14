@@ -1252,8 +1252,10 @@
   function drawMicro(time, C){
     if (!S.micro || !S.mlayout || microEl.hidden) return;
     const M = S.micro, Ly = S.mlayout, G = Ly.G, g = mcv.getContext('2d');
-    const center = microCenter(time), t0 = center - WIN/2, colsW = WIN*MCPS;
-    const cStart = Math.floor(t0*MCPS), cMid = Math.floor(center*MCPS), half = Math.ceil(colsW/2) + 1, deadline = performance.now() + 6;
+    // Analyse the window around the playhead. The first time, it unfolds from the playhead outward;
+    // after a jump, the previous view stays on screen until the new window is ready, then switches at once.
+    const target = microCenter(time), colsW = WIN*MCPS;
+    const cMid = Math.floor(target*MCPS), half = Math.ceil(colsW/2) + 1, deadline = performance.now() + 8;
     let pending = false;
     for (let k = 0; k <= half; k++){
       for (const c of [cMid + k, cMid - k - 1]){
@@ -1263,6 +1265,8 @@
       }
       if (pending) break;
     }
+    if (!pending || M.shown === undefined) M.shown = target;
+    const center = M.shown, t0 = center - WIN/2, cStart = Math.floor(t0*MCPS);
     if (pending && !S.playing) requestAnimationFrame(() => drawSong());
     // Ring
     const lut = M.t.album.lut, d = Ly.img.data, n = Ly.n;
