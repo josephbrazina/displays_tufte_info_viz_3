@@ -218,11 +218,11 @@
     <div class="plot" id="plot" tabindex="0" role="slider" aria-label="Playback position" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" aria-valuetext="0:00">
       <canvas id="cv"></canvas>
     </div>
-    <p class="hint">Click to play from that spot. Double-click anywhere on the circle for a ten-second close-up that follows the song as it plays. <kbd>Space</kbd> plays or pauses, <kbd>←</kbd> <kbd>→</kbd> skip five seconds, <kbd>Esc</kbd> goes back.</p>
+    <p class="hint">Click to play from that spot. Double-click anywhere on the circle for a 20-second close-up that follows the song as it plays. <kbd>Space</kbd> plays or pauses, <kbd>←</kbd> <kbd>→</kbd> skip five seconds, <kbd>Esc</kbd> goes back.</p>
     <section class="micro" id="micro" hidden>
       <div class="micro-head"><h2 id="microTitle"></h2><button class="ghost" id="closeMicro">Hide close-up</button></div>
       <div class="plot" id="microPlot"><canvas id="mcv"></canvas></div>
-      <p class="hint">The close-up always shows the ten seconds around the playhead, which sits at 6 o’clock while the song plays. Click the song’s circle above to jump anywhere; the close-up follows. Click inside the close-up to play from that exact moment.</p>
+      <p class="hint">The close-up always shows the 20 seconds around the playhead, which sits at 6 o’clock while the song plays. Click the song’s circle above to jump anywhere; the close-up follows. Click inside the close-up to play from that exact moment.</p>
     </section>
   </section>
 </main>
@@ -247,7 +247,7 @@
   const GITHUB = { owner: 'josephbrazina', repo: 'displays_tufte_info_viz_3' };
   const MUSIC_DIR = 'music';
 
-  const FMIN = 30, FMAX = 12000, COLS = 1200, ROWS = 160, N = 4096, WIN = 10, MCPS = 120, MROWS = 200, MN = 2048;   // close-up: 10 s window, 120 columns a second
+  const FMIN = 30, FMAX = 12000, COLS = 1200, ROWS = 160, N = 4096, WIN = 20, MCPS = 120, MROWS = 200, MN = 2048;   // close-up: 20 s window, 120 columns a second
   const QLO = -30, QHI = 70;          // stored dB range (quantised to 0–255)
   const DLO = 0, DHI = 56;            // shared display range: same for every album
   const AUDIO_RE = /\.(mp3|m4a|aac|wav|flac|ogg|oga|opus|aif|aiff)$/i;
@@ -1131,7 +1131,7 @@
   }
 
   // ---------- Close-up ----------
-  // A ten-second window that travels with the playhead. Columns are analysed on demand and kept,
+  // A 20-second window that travels with the playhead. Columns are analysed on demand and kept,
   // so each frame only computes the few new columns that have scrolled into view.
   async function openMicro(e){
     const t = S.song, h = songHit(e); if (!h) return;
@@ -1156,7 +1156,7 @@
         wb: P.wb };
     }
     S.micro.center = h.at;
-    $('microTitle').textContent = 'Close-up: the ten seconds around the playhead';
+    $('microTitle').textContent = 'Close-up: the 20 seconds around the playhead';
     sizeMicro(); drawSong();
     microEl.scrollIntoView({ block:'nearest' });
   }
