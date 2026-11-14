@@ -166,6 +166,14 @@
   .micro-head h2{ font-size:1rem; font-weight:500; margin:0; font-variant-numeric:tabular-nums; }
   .micro .plot{ margin-top:.75rem; }
 
+  .refs{ max-width:44rem; width:calc(100% - 2rem); max-height:calc(100dvh - 3rem); border:1px solid var(--line); border-radius:2px; padding:1.25rem 1.5rem 1.5rem; background:var(--bg); color:var(--ink); box-shadow:0 12px 40px rgba(0,0,0,.18); }
+  .refs::backdrop{ background:rgba(17,17,17,.35); }
+  .refs-head{ display:flex; align-items:baseline; justify-content:space-between; gap:1rem; }
+  .refs h2{ font-size:1.15rem; font-weight:600; margin:0; }
+  .refs h3{ font-size:.8rem; font-weight:600; color:var(--faint); margin:1.1rem 0 .3rem; }
+  .refs ul{ list-style:none; margin:0; padding:0; font-size:.85rem; line-height:1.4; }
+  .refs li{ padding-left:1.5em; text-indent:-1.5em; margin:.3rem 0; overflow-wrap:anywhere; }
+  .refs a{ color:var(--muted); }
   footer{ max-width:1360px; margin:0 auto; padding:2rem 1.5rem; color:var(--faint); font-size:.8rem; border-top:1px solid var(--line); }
   footer .linkish{ color:var(--faint); }
 
@@ -210,7 +218,7 @@
     <div class="ov-head">
       <div>
         <p class="ov-text">Each circle is one album with its songs placed end to end, running clockwise from 12 o’clock. Low frequencies sit on the inner edge of the ring and high frequencies on the outer edge. Inside, the waveform is split into three rings in the album’s own colors: lows such as kicks and bass innermost, then mids such as vocals and instruments, then highs such as hi-hats and cymbals. Each album fills its whole circle, starting at the mark at 12 o’clock, so the circles compare the shape of each album rather than its length (lengths are listed beside each one). Every album shares one loudness scale: lighter color means louder sound. Each album takes its hues from its own cover.</p>
-        <p class="hint">Albums load when you ask for them. Click a circle to play from that spot, double-click it or click the album’s name to open it. Click an artist’s name (or press <kbd>1</kbd>–<kbd>5</kbd>) to see just their three albums, larger; <kbd>0</kbd> or <kbd>Esc</kbd> shows everyone again. <button class="linkish" id="forgetOv">Forget saved analysis</button></p>
+        <p class="hint">Albums load when you ask for them. Click a circle to play from that spot, double-click it or click the album’s name to open it. Click an artist’s name (or press <kbd>1</kbd>–<kbd>5</kbd>) to see just their three albums, larger; <kbd>0</kbd> or <kbd>Esc</kbd> shows everyone again. <button class="linkish" id="forgetOv">Forget saved analysis</button> · <button class="linkish refs-open">References</button></p>
       </div>
       <button class="btn primary" id="loadAll">Load every album</button>
     </div>
@@ -260,9 +268,36 @@
 
 <footer id="footer" hidden>
   Analysed songs are saved in this browser so they open instantly next time.
-  <button class="linkish" id="forget">Forget saved analysis</button>
+  <button class="linkish" id="forget">Forget saved analysis</button> · <button class="linkish refs-open">References</button>
 </footer>
 
+<dialog class="refs" id="refs" aria-labelledby="refsTitle">
+  <div class="refs-head"><h2 id="refsTitle">References</h2><button class="ghost" id="refsClose" aria-label="Close references">Close</button></div>
+  <h3>Method</h3>
+  <ul>
+    <li>Tufte, E. R. (1990). <i>Envisioning information</i>. Graphics Press.</li>
+    <li>Tufte, E. R. (2001). <i>The visual display of quantitative information</i> (2nd ed.). Graphics Press.</li>
+    <li>Ottosson, B. (2020). <i>A perceptual color space for image processing</i> [Blog post]. <a href="https://bottosson.github.io/posts/oklab/" target="_blank" rel="noopener">https://bottosson.github.io/posts/oklab/</a></li>
+  </ul>
+  <h3>Albums</h3>
+  <ul>
+      <li>The Beatles. (1965). <i>Rubber soul</i> [Album]. Parlophone.</li>
+      <li>The Beatles. (1966). <i>Revolver</i> [Album]. Parlophone.</li>
+      <li>The Beatles. (1967). <i>Sgt. Pepper’s lonely hearts club band</i> [Album]. Parlophone.</li>
+      <li>Pink Floyd. (1973). <i>The dark side of the moon</i> [Album]. Harvest Records.</li>
+      <li>Pink Floyd. (1975). <i>Wish you were here</i> [Album]. Harvest Records.</li>
+      <li>Pink Floyd. (1977). <i>Animals</i> [Album]. Harvest Records.</li>
+      <li>Nujabes. (2003). <i>Metaphorical music</i> [Album]. Hydeout Productions.</li>
+      <li>Nujabes. (2005). <i>Modal soul</i> [Album]. Hydeout Productions.</li>
+      <li>Nujabes &amp; Shing02. (2015). <i>Luv(sic) hexalogy</i> [Album]. Hydeout Productions.</li>
+      <li>Kanye West. (2004). <i>The college dropout</i> [Album]. Roc-A-Fella Records.</li>
+      <li>Kanye West. (2008). <i>808s &amp; heartbreak</i> [Album]. Roc-A-Fella Records.</li>
+      <li>Kids See Ghosts. (2018). <i>Kids see ghosts</i> [Album]. GOOD Music; Def Jam Recordings.</li>
+      <li>Steve Lacy. (2019). <i>Apollo XXI</i> [Album]. 3qtr.</li>
+      <li>Steve Lacy. (2022). <i>Gemini rights</i> [Album]. L-M Records; RCA Records.</li>
+      <li>Steve Lacy. (2026). <i>Oh yeah?</i> [Album]. RCA Records.</li>
+  </ul>
+</dialog>
 <div id="tip" hidden></div>
 <div class="bar" id="bar" hidden>
   <button class="play" id="play" aria-label="Play">
@@ -441,9 +476,30 @@
   }
   // Even lightness steps from dark to light, whatever the cover's hues
   const relight = cols => cols.map((c, i) => { const o = toOk(c); return fromOk([0.18 + 0.78*i/(cols.length-1), o[1], o[2]]); });
+  // A cover set inside a plain frame (such as Wish You Were Here's white border) is cropped to its picture first
+  function pictureBox(g, size){
+    const d = g.getImageData(0, 0, size, size).data, at = (x, y) => { const i = (y*size + x)*4; return [d[i], d[i+1], d[i+2]]; };
+    const ring = []; for (let k = 0; k < size; k++) ring.push(at(k,0), at(k,size-1), at(0,k), at(size-1,k));
+    const bg = [0,1,2].map(c => ring.map(p => p[c]).sort((a,b) => a-b)[ring.length >> 1]);
+    const far = p => Math.abs(p[0]-bg[0]) + Math.abs(p[1]-bg[1]) + Math.abs(p[2]-bg[2]);
+    if (ring.filter(p => far(p) < 30).length < ring.length*0.85) return null;   // no plain frame
+    let x0 = size, y0 = size, x1 = -1, y1 = -1;
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) if (far(at(x,y)) > 45){ x0 = Math.min(x0,x); x1 = Math.max(x1,x); y0 = Math.min(y0,y); y1 = Math.max(y1,y); }
+    const w = x1 - x0 + 1, h = y1 - y0 + 1;
+    if (x1 < 0 || w*h > size*size*0.85 || w*h < size*size*0.12) return null;
+    if (x0 < 3 || y0 < 3 || x1 > size-4 || y1 > size-4) return null;   // the picture must sit inside the frame on every side
+    const m = 1;   // step inside the picture's edge
+    return [x0 + m, y0 + m, w - 2*m, h - 2*m].map(v => v / size);
+  }
   function extractPalette(img){
     const size = 64, cnv = document.createElement('canvas'); cnv.width = size; cnv.height = size;
     const g = cnv.getContext('2d'); g.drawImage(img, 0, 0, size, size);
+    const box = pictureBox(g, size);
+    if (box){
+      const W = img.naturalWidth || img.width, H = img.naturalHeight || img.height;
+      g.clearRect(0, 0, size, size);
+      g.drawImage(img, box[0]*W, box[1]*H, box[2]*W, box[3]*H, 0, 0, size, size);
+    }
     const d = g.getImageData(0, 0, size, size).data, px = [];
     for (let i = 0; i < d.length; i += 4) px.push([d[i], d[i+1], d[i+2]]);
     const byLum = px.slice().sort((a,b) => lum(a) - lum(b));
@@ -451,7 +507,12 @@
     let dark = [0,1,2].map(k => darkSet.reduce((s,p) => s + p[k], 0) / darkSet.length);
     if (lum(dark) > 0.12){ const s = 0.1 / lum(dark); dark = dark.map(v => v*s); }
 
-    const vivid = px.map(p => [p, rgbToHsv(p)]).filter(([, h]) => h[1] > 0.4 && h[2] > 0.3);
+    // Vivid hues first; a softly colored photo (sky, sand, flame) falls back to its gentler hues, strengthened
+    let vivid = px.map(p => [p, rgbToHsv(p)]).filter(([, h]) => h[1] > 0.4 && h[2] > 0.3), boost = 1.2;
+    if (vivid.length < px.length*0.02){
+      const soft = px.map(p => [p, rgbToHsv(p)]).filter(([, h]) => h[1] > 0.16 && h[2] > 0.3);
+      if (soft.length >= px.length*0.15){ vivid = soft; boost = 1.9; }
+    }
     let cols = [];
     if (vivid.length >= px.length*0.02){
       const B = 24, bins = Array.from({ length:B }, () => []);
@@ -465,7 +526,7 @@
       cols = picks.map(b => {
         const mean = [0,1,2].map(k => bins[b].reduce((s, [p]) => s + p[k], 0) / bins[b].length);
         const [h,s,v] = rgbToHsv(mean);
-        return hsvToRgb([h, Math.min(1, s*1.2), Math.min(1, v*1.05)]);
+        return hsvToRgb([h, Math.min(1, s*boost), Math.min(1, v*1.05)]);
       });
     }
     if (!cols.length){
@@ -1480,6 +1541,10 @@
   $('songBack').addEventListener('click', backToAlbum);
   $('songHome').addEventListener('click', () => { S.micro = null; microEl.hidden = true; backToOverview(); });
   $('closeMicro').addEventListener('click', closeMicro);
+  const refs = $('refs');
+  document.querySelectorAll('.refs-open').forEach(b => b.addEventListener('click', () => refs.showModal()));
+  $('refsClose').addEventListener('click', () => refs.close());
+  refs.addEventListener('click', e => { if (e.target === refs) refs.close(); });   // click outside the box closes it
   $('play').addEventListener('click', toggle);
   $('forgetOv').addEventListener('click', async () => { await cacheClear(); $('forgetOv').textContent = 'Saved analysis cleared'; });
   $('forget').addEventListener('click', async () => { await cacheClear(); $('forget').textContent = 'Saved analysis cleared'; });
@@ -1512,6 +1577,7 @@
 
   document.addEventListener('keydown', e => {
     const inControl = e.target.closest && e.target.closest('input, button, textarea, select');
+    if (refs.open) return;   // the references box handles its own keys
     if (e.key === 'Escape'){
       if (S.view === 'song'){ e.preventDefault(); if (!microEl.hidden) closeMicro(); else backToAlbum(); return; }
       if (S.view === 'album'){ e.preventDefault(); backToOverview(); return; }
