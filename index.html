@@ -65,6 +65,9 @@
   .head-row > div:first-child{ flex:1 1 22rem; }
   .legend{ display:flex; align-items:center; gap:.5rem; color:var(--faint); font-size:.8rem; margin-top:.8rem; }
   .legend .ramp{ width:120px; height:8px; }
+  .legend .sw{ display:inline-block; width:10px; height:10px; margin:0 .3rem 0 .6rem; vertical-align:-1px; }
+  .legend .lg-hint{ color:var(--faint); }
+  #albumBands, #songBands{ margin-top:.35rem; color:var(--muted); display:block; }
 
   .sr-only{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
   .ov-head{ display:flex; align-items:flex-start; gap:1.5rem; flex:none; }
@@ -176,7 +179,7 @@
     <h1 id="ovTitle" class="sr-only">Albums as sound</h1>
     <div class="ov-head">
       <div>
-        <p class="ov-text">Each circle is one album with its songs placed end to end, running clockwise from 12 o’clock. Low frequencies sit on the inner edge of the ring and high frequencies on the outer edge, with the waveform inside. Each album fills its whole circle, starting at the mark at 12 o’clock, so the circles compare the shape of each album rather than its length (lengths are listed beside each one). Every album shares one loudness scale: lighter color means louder sound. Each album takes its hues from its own cover.</p>
+        <p class="ov-text">Each circle is one album with its songs placed end to end, running clockwise from 12 o’clock. Low frequencies sit on the inner edge of the ring and high frequencies on the outer edge. Inside, the waveform is split into three rings in the album’s own colors: lows such as kicks and bass innermost, then mids such as vocals and instruments, then highs such as hi-hats and cymbals. Each album fills its whole circle, starting at the mark at 12 o’clock, so the circles compare the shape of each album rather than its length (lengths are listed beside each one). Every album shares one loudness scale: lighter color means louder sound. Each album takes its hues from its own cover.</p>
         <p class="hint">Albums load when you ask for them. Click a circle to play from that spot, double-click it or click the album’s name to open it. <button class="linkish" id="forgetOv">Forget saved analysis</button></p>
       </div>
       <button class="btn primary" id="loadAll">Load every album</button>
@@ -194,7 +197,8 @@
         <p class="meta" id="albumArtist"></p>
         <h1 id="albumTitle"></h1>
         <p class="meta" id="albumMeta"></p>
-        <div class="legend"><span>Quiet</span><span class="ramp" id="albumRamp"></span><span>Loud</span></div>
+        <div class="legend"><span>Ring:</span><span>Quiet</span><span class="ramp" id="albumRamp"></span><span>Loud</span></div>
+        <div class="legend" id="albumBands"></div>
       </div>
     </div>
     <p class="hint">Songs share this album’s time scale, running clockwise from 12 o’clock; ticks mark each minute. Click a song to play from that spot; double-click it to enlarge it.</p>
@@ -210,14 +214,15 @@
     </div>
     <p class="meta" id="songMeta"></p>
     <h1 id="songTitle"></h1>
+    <div class="legend" id="songBands"></div>
     <div class="plot" id="plot" tabindex="0" role="slider" aria-label="Playback position" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" aria-valuetext="0:00">
       <canvas id="cv"></canvas>
     </div>
-    <p class="hint">Click to play from that spot. Double-click anywhere on the circle for a close-up of the ten seconds around it. <kbd>Space</kbd> plays or pauses, <kbd>←</kbd> <kbd>→</kbd> skip five seconds, <kbd>Esc</kbd> goes back.</p>
+    <p class="hint">Click to play from that spot. Double-click anywhere on the circle for a five-second close-up that follows the song as it plays. <kbd>Space</kbd> plays or pauses, <kbd>←</kbd> <kbd>→</kbd> skip five seconds, <kbd>Esc</kbd> goes back.</p>
     <section class="micro" id="micro" hidden>
       <div class="micro-head"><h2 id="microTitle"></h2><button class="ghost" id="closeMicro">Hide close-up</button></div>
       <div class="plot" id="microPlot"><canvas id="mcv"></canvas></div>
-      <p class="hint">Click inside the close-up to play from that exact moment.</p>
+      <p class="hint">The close-up always shows the five seconds around the playhead, which sits at 6 o’clock while the song plays. Click the song’s circle above to jump anywhere; the close-up follows. Click inside the close-up to play from that exact moment.</p>
     </section>
   </section>
 </main>
@@ -242,7 +247,7 @@
   const GITHUB = { owner: 'josephbrazina', repo: 'displays_tufte_info_viz_3' };
   const MUSIC_DIR = 'music';
 
-  const FMIN = 30, FMAX = 12000, COLS = 1200, ROWS = 160, N = 4096, WIN = 10;
+  const FMIN = 30, FMAX = 12000, COLS = 1200, ROWS = 160, N = 4096, WIN = 5, MCPS = 120, MROWS = 200, MN = 2048;   // close-up: 5 s window, 120 columns a second
   const QLO = -30, QHI = 70;          // stored dB range (quantised to 0–255)
   const DLO = 0, DHI = 56;            // shared display range: same for every album
   const AUDIO_RE = /\.(mp3|m4a|aac|wav|flac|ogg|oga|opus|aif|aiff)$/i;
@@ -757,6 +762,61 @@
   }
   function hideTip(){ tip.hidden = true; }
 
+  // Three-band waveform: lows (kicks, bass), mids (vocals, instruments), highs (hi-hats, cymbals).
+  // Each band has its own fixed scale, the same for every song and album, because highs naturally
+  // carry far less energy than lows and would vanish on a single shared scale.
+  const BANDS = [
+    { name:'Low',  hint:'kicks, bass',          f0:30,   f1:250,   lo:10,  hi:50, pos:0.27 },
+    { name:'Mid',  hint:'vocals, instruments',  f0:250,  f1:4000,  lo:4,   hi:40, pos:0.50 },
+    { name:'High', hint:'hi-hats, cymbals',     f0:4000, f1:12000, lo:-10, hi:24, pos:0.73 }
+  ];
+  const QPOW = new Float64Array(256);
+  for (let q = 0; q < 256; q++) QPOW[q] = Math.pow(10, (QLO + q/255*(QHI-QLO))/10);
+  function bandLevels(q, cols, rows, fmax){
+    const lr = Math.log(fmax/FMIN), rowOf = f => Math.max(0, Math.min(rows, Math.round(rows*Math.log(f/FMIN)/lr)));
+    return BANDS.map(b => {
+      const r0 = rowOf(b.f0), r1 = Math.max(r0 + 1, rowOf(Math.min(b.f1, fmax))), out = new Float32Array(cols);
+      for (let c = 0; c < cols; c++){
+        let sum = 0; for (let r = r0; r < r1; r++) sum += QPOW[q[c*rows + r]];
+        const db = 10*Math.log10(sum/(r1 - r0));
+        out[c] = Math.max(0, Math.min(1, (db - b.lo)/(b.hi - b.lo)));
+      }
+      return out;
+    });
+  }
+  const trackBands = t => t.bands || (t.bands = bandLevels(t.q, COLS, ROWS, t.fmax));
+  // Band colors come from the album's own palette, so they match its irisgram
+  function bandColors(al){
+    if (!al.bc || al.bcStops !== al.stops){ al.bc = BANDS.map(b => 'rgb(' + cmapWith(al.stops, b.pos).map(Math.round).join(',') + ')'); al.bcStops = al.stops; }
+    return al.bc;
+  }
+  function bandLegendHtml(al){
+    const c = bandColors(al);
+    return 'Waveform rings, inside out: ' + BANDS.map((b, i) => '<span class="sw" style="background:' + c[i] + '"></span>' + b.name + ' <span class="lg-hint">(' + b.hint + ')</span>').join(' ');
+  }
+  // Three concentric lanes inside the ring: lows innermost, highs outermost, each mirrored around its own center line
+  function drawBands(g, G, arc, n, bands, played, cols){
+    const N = Math.max(48, Math.min(n, Math.round(TAU*G.rb*arc)));
+    const lane = 2*G.A/3, inner = G.rb - G.A;
+    const P = bands.map(() => [new Path2D(), new Path2D()]);
+    for (let i = 0; i < N; i++){
+      const i0 = Math.floor(i/N*n), i1 = Math.max(i0 + 1, Math.floor((i+1)/N*n));
+      const f = (i + 0.5)/N, a = angOf(f*arc), ca = Math.cos(a), sa = Math.sin(a), on = played(f) ? 1 : 0;
+      for (let k = 0; k < bands.length; k++){
+        let v = 0; for (let j = i0; j < i1; j++) if (bands[k][j] > v) v = bands[k][j];
+        const c = inner + (k + 0.5)*lane, h = Math.max(0.35, v*lane*0.47);
+        P[k][on].moveTo(G.cx + ca*(c - h), G.cy + sa*(c - h)); P[k][on].lineTo(G.cx + ca*(c + h), G.cy + sa*(c + h));
+      }
+    }
+    g.lineWidth = Math.max(0.8, TAU*G.rb*arc/N*0.85);
+    for (let k = 0; k < P.length; k++){
+      g.strokeStyle = cols[k];
+      g.globalAlpha = 1; g.stroke(P[k][0]);
+      g.globalAlpha = 0.3; g.stroke(P[k][1]);   // already played: faded
+    }
+    g.globalAlpha = 1;
+  }
+
   // Album timeline (songs end to end), pooled to a size that suits the small overview circles
   function buildStrip(al){
     const W = 480, R = 64, ready = al.tracks.filter(t => t.status === 'ready');
@@ -764,6 +824,7 @@
     if (!ready.length || !al.dur){ al.oq = null; return; }
     al.bounds = []; let acc = 0; ready.forEach(t => { al.bounds.push({ t, start:acc, end:acc + t.dur }); acc += t.dur; });
     al.oq = new Uint8Array(W*R); al.opeak = new Float32Array(W); al.orms = new Float32Array(W);
+    al.obands = BANDS.map(() => new Float32Array(W));
     const step = ROWS / R; let bi = 0;
     for (let x = 0; x < W; x++){
       const time = (x + 0.5) / W * al.dur;
@@ -774,6 +835,8 @@
       let pk = 0, rs = 0;
       for (let c = c0; c < c1; c++){ if (t.peak[c] > pk) pk = t.peak[c]; if (t.rms[c] > rs) rs = t.rms[c]; }
       al.opeak[x] = pk; al.orms[x] = rs;
+      const tb = trackBands(t);
+      for (let k = 0; k < BANDS.length; k++){ let v = 0; for (let c = c0; c < c1; c++) if (tb[k][c] > v) v = tb[k][c]; al.obands[k][x] = v; }
       for (let r = 0; r < R; r++){
         let m = 0; const r0 = Math.floor(r*step), r1 = Math.floor((r+1)*step);
         for (let c = c0; c < c1; c++) for (let k = r0; k < r1; k++){ const v = t.q[c*ROWS + k]; if (v > m) m = v; }
@@ -887,7 +950,7 @@
     g.drawImage(al.base, 0, 0, G.size, G.size);
     const playing = S.play && S.play.album === al ? al.bounds.find(b => b.t === S.play) : null;
     const a0 = playing ? playing.start/al.dur : 2, a1 = playing ? (playing.start + curTime())/al.dur : -1;
-    drawWave(g, G, arc, al.oW, al.opeak, al.orms, f => f >= a0 && f <= a1, C);
+    drawBands(g, G, arc, al.oW, al.obands, f => f >= a0 && f <= a1, bandColors(al));
     al.bounds.slice(0, -1).forEach(b => radial(g, G, b.end/al.dur*arc, G.rb - G.A - 2, G.R1 + 1, C.bg, 1.5));   // gaps between songs
     if (al.hover) irisLine(g, G, al.hover.f, C, 1);
     if (playing) irisLine(g, G, a1*arc, C, 2);
@@ -913,6 +976,7 @@
     const ready = al.tracks.filter(t => t.status === 'ready');
     $('albumMeta').textContent = al.tracks.length + (al.tracks.length === 1 ? ' song' : ' songs') + (al.status === 'ready' ? ', ' + fmt(al.dur) : '');
     $('albumRamp').style.background = rampCss(al.stops);
+    $('albumBands').innerHTML = bandLegendHtml(al);
     if (al.status !== 'ready') al.maxSong = Math.max(1, ...ready.map(t => t.dur));
     al.tracks.forEach(t => {
       if (t.durEl) t.durEl.textContent = t.status === 'ready' ? fmt(t.dur) : '';
@@ -983,7 +1047,7 @@
     scaleRing(g, G, ARC, ticks, C);
     g.drawImage(t.base, 0, 0, G.size, G.size);
     const isPlay = S.play === t, pf = isPlay ? curTime()/t.dur : -1;
-    drawWave(g, G, arc, COLS, t.peak, t.rms, f => f <= pf, C);
+    drawBands(g, G, arc, COLS, trackBands(t), f => f <= pf, bandColors(t.album));
     if (t.hover) irisLine(g, G, t.hover.f, C, 1);
     if (isPlay) irisLine(g, G, pf*arc, C, 2);
   }
@@ -994,6 +1058,7 @@
     $('songTitle').textContent = t.title;
     $('songMeta').textContent = t.album.artist.name + ', ' + t.album.name + ', song ' + t.no + ' of ' + t.album.tracks.length + ', ' + fmt(t.dur);
     plot.setAttribute('aria-valuemax', Math.round(t.dur));
+    $('songBands').innerHTML = bandLegendHtml(t.album);
     showView('song');
     window.scrollTo(0, 0);
     sizeSong();
@@ -1046,12 +1111,13 @@
     if (!t.sbase || t.sbaseKey !== key){ t.sbase = irisBase(G, Ly.dpr, ARC, COLS, ROWS, (c, r) => t.q[c*ROWS + r], t.album.lut); t.sbaseKey = key; }
     g.drawImage(t.sbase, 0, 0, G.size, G.size);
     const mine = S.play === t, time = mine ? curTime() : 0, pf = mine ? time/t.dur : -1;
-    drawWave(g, G, ARC, COLS, t.peak, t.rms, f => f <= pf, C);
+    drawBands(g, G, ARC, COLS, trackBands(t), f => f <= pf, bandColors(t.album));
     const step = t.dur > 240 ? 60 : t.dur > 90 ? 30 : 10, ticks = [];
     for (let s = step; s <= t.dur; s += step) ticks.push([ARC*s/t.dur, G.size < 480 && (s/step) % 2 ? null : fmt(s)]);   // 0:00 is the gap at 12 o'clock
     irisLabels(g, G, t.fmax, ticks, C);
     if (S.micro && S.micro.t === t){
-      const f0 = ARC*S.micro.t0/t.dur, f1 = ARC*S.micro.t1/t.dur;
+      const mc = mine ? time : S.micro.center;
+      const f0 = ARC*Math.max(0, mc - WIN/2)/t.dur, f1 = ARC*Math.min(t.dur, mc + WIN/2)/t.dur;
       wedge(g, G, f0, f1, G.R0, G.R1, '#ffffff');
       wedge(g, G, f0, f1, G.rb - G.A - 2, G.rb + G.A + 2, C.ink);
     }
@@ -1063,56 +1129,117 @@
   }
 
   // ---------- Close-up ----------
+  // A five-second window that travels with the playhead. Columns are analysed on demand and kept,
+  // so each frame only computes the few new columns that have scrolled into view.
   async function openMicro(e){
     const t = S.song, h = songHit(e); if (!h) return;
-    const t0 = Math.min(Math.max(0, h.at - WIN/2), Math.max(0, t.dur - WIN)), t1 = Math.min(t.dur, t0 + WIN);
     $('microTitle').textContent = 'Loading close-up…';
     microEl.hidden = false;
     let cur;
     try { cur = await ensureDecoded(t); } catch (err){ $('microTitle').textContent = 'This song couldn’t be decoded for a close-up.'; return; }
     if (S.song !== t || S.view !== 'song') return;
-    const M = { t, t0, t1, mono: cur.mono, sr: cur.buf.sampleRate, cols: 700, rows: 200 };
-    const res = await computeDb(cur.mono, M.sr, t0*M.sr, t1*M.sr, M.cols, M.rows, 2048, 0);
-    M.q = quantise(res.db);
-    S.micro = M;
-    $('microTitle').textContent = 'Close-up, ' + fmt(t0) + ' to ' + fmt(t1);
+    if (!S.micro || S.micro.t !== t){
+      const sr = cur.buf.sampleRate, fmax = Math.min(FMAX, sr/2), ratio = fmax / FMIN, total = Math.ceil(t.dur * MCPS);
+      const b0 = new Int32Array(MROWS), b1 = new Int32Array(MROWS);
+      for (let r = 0; r < MROWS; r++){
+        const f0 = FMIN * Math.pow(ratio, r/MROWS), f1 = FMIN * Math.pow(ratio, (r+1)/MROWS);
+        b0[r] = Math.floor(f0*MN/sr); b1[r] = Math.max(b0[r]+1, Math.ceil(f1*MN/sr));
+      }
+      const win = new Float32Array(MN); for (let i = 0; i < MN; i++) win[i] = 0.5 - 0.5*Math.cos(2*Math.PI*i/(MN-1));
+      const lr = Math.log(fmax/FMIN), rowOf = f => Math.max(0, Math.min(MROWS, Math.round(MROWS*Math.log(f/FMIN)/lr)));
+      S.micro = { t, mono: cur.mono, sr, fmax, total, b0, b1, win, re: new Float32Array(MN), im: new Float32Array(MN),
+        q: new Uint8Array(total*MROWS), done: new Uint8Array(total), bands: BANDS.map(() => new Float32Array(total)),
+        bandRows: BANDS.map(b => { const r0 = rowOf(b.f0); return [r0, Math.max(r0 + 1, rowOf(Math.min(b.f1, fmax)))]; }),
+        wb: BANDS.map(() => new Float32Array(WIN*MCPS)) };
+    }
+    S.micro.center = h.at;
+    $('microTitle').textContent = 'Close-up: the five seconds around the playhead';
     sizeMicro(); drawSong();
     microEl.scrollIntoView({ block:'nearest' });
   }
+  function microColumn(M, c){
+    if (M.done[c]) return;
+    const centre = Math.floor((c + 0.5)/MCPS*M.sr) - MN/2, len = M.mono.length, re = M.re, im = M.im, offset = 20*Math.log10(4096/MN), k255 = 255/(QHI-QLO);
+    for (let i = 0; i < MN; i++){ const k = centre + i; re[i] = (k >= 0 && k < len ? M.mono[k] : 0) * M.win[i]; im[i] = 0; }
+    fft(re, im);
+    const base = c*MROWS;
+    for (let r = 0; r < MROWS; r++){
+      let m = 0;
+      for (let b = M.b0[r]; b < M.b1[r]; b++){ const v = re[b]*re[b] + im[b]*im[b]; if (v > m) m = v; }
+      const db = 10*Math.log10(m + 1e-12) + offset;
+      M.q[base + r] = Math.max(0, Math.min(255, Math.round((db - QLO)*k255)));
+    }
+    for (let k = 0; k < BANDS.length; k++){
+      const [r0, r1] = M.bandRows[k]; let sum = 0;
+      for (let r = r0; r < r1; r++) sum += QPOW[M.q[base + r]];
+      M.bands[k][c] = Math.max(0, Math.min(1, (10*Math.log10(sum/(r1 - r0)) - BANDS[k].lo)/(BANDS[k].hi - BANDS[k].lo)));
+    }
+    M.done[c] = 1;
+  }
   function closeMicro(){ S.micro = null; S.mlayout = null; microEl.hidden = true; drawSong(); }
+  // Precompute, for every pixel of the ring, where it falls in the window (0–1) and which frequency row it shows
   function sizeMicro(){
     if (!S.micro || microEl.hidden || !S.layout) return;
     const w = mcv.parentElement.clientWidth;
     const size = Math.round(Math.max(300, Math.min(w, window.innerHeight*0.72)));
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = Math.min(1.5, window.devicePixelRatio || 1);
     mcv.width = mcv.height = Math.round(size*dpr); mcv.style.width = mcv.style.height = size + 'px';
-    const G = irisGeom(size, 34);
-    S.mlayout = { size, dpr, G };
-    const M = S.micro;
-    M.base = irisBase(G, dpr, ARC, M.cols, M.rows, (c, r) => M.q[c*M.rows + r], M.t.album.lut);
-    const N = Math.max(120, Math.round(TAU*G.rb*ARC*1.5));
-    const s0 = Math.floor(M.t0*M.sr), s1 = Math.floor(M.t1*M.sr), per = (s1 - s0)/N;
-    M.mins = new Float32Array(N); M.maxs = new Float32Array(N);
-    for (let i = 0; i < N; i++){
-      const a = s0 + Math.floor(i*per), b = Math.max(a+1, s0 + Math.floor((i+1)*per));
-      let mn = 1, mx = -1;
-      for (let k = a; k < b && k < M.mono.length; k++){ const v = M.mono[k]; if (v < mn) mn = v; if (v > mx) mx = v; }
-      M.mins[i] = mn; M.maxs[i] = mx;
+    const G = irisGeom(size, 34), px = Math.round(size*dpr);
+    const cx = G.cx*dpr, cy = G.cy*dpr, R0 = G.R0*dpr, R1 = G.R1*dpr, span = R1 - R0;
+    const pix = [], us = [], rows = [], alphas = [];
+    for (let y = 0; y < px; y++){
+      const dy = y + 0.5 - cy;
+      for (let x = 0; x < px; x++){
+        const dx = x + 0.5 - cx, r = Math.sqrt(dx*dx + dy*dy);
+        if (r < R0 - 1 || r > R1 + 1) continue;
+        let a = Math.atan2(dx, -dy); if (a < 0) a += TAU;
+        const f = a / TAU; if (f >= ARC) continue;
+        const al = Math.max(0, Math.min(1, r - R0 + 0.5, R1 - r + 0.5, (ARC - f)*TAU*r + 0.5, f*TAU*r + 0.5));
+        if (al <= 0) continue;
+        pix.push((y*px + x)*4); us.push(f/ARC); rows.push(Math.max(0, Math.min(MROWS-1, ((r - R0)/span*MROWS) | 0))); alphas.push(Math.round(al*255));
+      }
     }
+    const off = document.createElement('canvas'); off.width = off.height = px;
+    const octx = off.getContext('2d');
+    S.mlayout = { size, dpr, G, off, octx, img: octx.createImageData(px, px),
+      pix: Int32Array.from(pix), u: Float32Array.from(us), row: Uint8Array.from(rows), alpha: Uint8Array.from(alphas) };
+  }
+  function microCenter(time){
+    const M = S.micro;
+    if (S.play === M.t && time >= 0) M.center = time;   // follow the playhead
+    return M.center;
   }
   function drawMicro(time, C){
     if (!S.micro || !S.mlayout || microEl.hidden) return;
-    const g = mcv.getContext('2d'), Ly = S.mlayout, G = Ly.G, M = S.micro, span = M.t1 - M.t0;
+    const M = S.micro, Ly = S.mlayout, G = Ly.G, g = mcv.getContext('2d');
+    const center = microCenter(time), t0 = center - WIN/2, colsW = WIN*MCPS;
+    const cStart = Math.floor(t0*MCPS);
+    for (let c = Math.max(0, cStart); c <= Math.min(M.total - 1, cStart + colsW + 1); c++) microColumn(M, c);
+    // Ring
+    const lut = M.t.album.lut, d = Ly.img.data, n = Ly.pix.length;
+    for (let i = 0; i < n; i++){
+      const c = Math.floor((t0 + Ly.u[i]*WIN)*MCPS), p = Ly.pix[i];
+      if (c < 0 || c >= M.total){ d[p+3] = 0; continue; }
+      const k = M.q[c*MROWS + Ly.row[i]]*3;
+      d[p] = lut[k]; d[p+1] = lut[k+1]; d[p+2] = lut[k+2]; d[p+3] = Ly.alpha[i];
+    }
+    Ly.octx.putImageData(Ly.img, 0, 0);
     g.setTransform(Ly.dpr,0,0,Ly.dpr,0,0);
     g.clearRect(0,0,G.size,G.size);
-    g.drawImage(M.base, 0, 0, G.size, G.size);
-    const inSpan = time >= M.t0 && time <= M.t1, pf = inSpan ? (time - M.t0)/span : time > M.t1 ? 2 : -1;
-    g.strokeStyle = C.line; g.lineWidth = 1; g.beginPath(); g.arc(G.cx, G.cy, G.rb, angOf(0), angOf(ARC)); g.stroke();
-    drawSigned(g, G, ARC, M.mins, M.maxs, f => f <= pf, C);
+    g.imageSmoothingEnabled = true;
+    g.drawImage(Ly.off, 0, 0, G.size, G.size);
+    // Waveform rings for the same window
+    for (let j = 0; j < colsW; j++){
+      const c = cStart + j, ok = c >= 0 && c < M.total;
+      for (let k = 0; k < BANDS.length; k++) M.wb[k][j] = ok ? M.bands[k][c] : 0;
+    }
+    const pf = time >= 0 && S.play === M.t ? (time - t0)/WIN : -1;
+    drawBands(g, G, ARC, colsW, M.wb, f => f <= pf, bandColors(M.t.album));
+    // Seconds around the outside move with the window
     const ticks = [];
-    for (let s = Math.ceil(M.t0); s <= M.t1; s++) ticks.push([ARC*(s - M.t0)/span, fmt(s)]);
-    irisLabels(g, G, Math.min(FMAX, M.sr/2), ticks, C);
-    if (inSpan) irisLine(g, G, pf*ARC, C, 2);
+    for (let s = Math.max(0, Math.ceil(t0)); s <= Math.min(M.t.dur, t0 + WIN); s++) ticks.push([ARC*(s - t0)/WIN, fmt(s)]);
+    irisLabels(g, G, M.fmax, ticks, C);
+    if (pf >= 0 && pf <= 1) irisLine(g, G, pf*ARC, C, 2);
   }
 
   // ---------- Playback ----------
@@ -1191,7 +1318,7 @@
   }
   function drawAll(){
     if (S.view === 'overview') S.albums.forEach(drawCell);
-    else if (S.view === 'album' && S.album){ $('albumRamp').style.background = rampCss(S.album.stops); S.album.tracks.forEach(drawTile); }
+    else if (S.view === 'album' && S.album){ $('albumRamp').style.background = rampCss(S.album.stops); $('albumBands').innerHTML = bandLegendHtml(S.album); S.album.tracks.forEach(drawTile); }
     else if (S.view === 'song') drawSong();
     updateBar();
   }
@@ -1224,16 +1351,17 @@
     if (!S.playing) drawSong();
   });
   cv.addEventListener('pointerleave', () => { S.hover = null; hideTip(); if (!S.playing) drawSong(); });
-  mcv.addEventListener('pointerdown', e => {
-    if (!S.micro || !S.mlayout) return;
-    const p = polarAt(e, mcv, S.mlayout.G); if (p.f > ARC) return;
-    playTrack(S.micro.t, S.micro.t0 + p.f/ARC*(S.micro.t1 - S.micro.t0));
-  });
+  const microTime = e => {
+    if (!S.micro || !S.mlayout) return null;
+    const G = S.mlayout.G, p = polarAt(e, mcv, G);
+    if (p.f > ARC || p.r < G.rb - G.A - 6 || p.r > G.R1 + 10) return null;
+    const tt = S.micro.center - WIN/2 + p.f/ARC*WIN;
+    return tt >= 0 && tt <= S.micro.t.dur ? tt : null;
+  };
+  mcv.addEventListener('pointerdown', e => { const tt = microTime(e); if (tt !== null) playTrack(S.micro.t, tt); });
   mcv.addEventListener('pointermove', e => {
-    if (!S.micro || !S.mlayout || e.pointerType === 'touch') return;
-    const p = polarAt(e, mcv, S.mlayout.G);
-    const tt = S.micro.t0 + p.f/ARC*(S.micro.t1 - S.micro.t0);
-    if (p.f <= ARC && p.r > S.mlayout.G.rb - S.mlayout.G.A - 6 && p.r < S.mlayout.G.R1 + 10) showTip(e, fmt(tt) + '.' + (Math.floor(tt*10) % 10)); else hideTip();
+    if (e.pointerType === 'touch') return;
+    const tt = microTime(e); if (tt !== null) showTip(e, fmt(tt) + '.' + (Math.floor(tt*10) % 10)); else hideTip();
   });
   mcv.addEventListener('pointerleave', hideTip);
   plot.addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); toggle(); } });
